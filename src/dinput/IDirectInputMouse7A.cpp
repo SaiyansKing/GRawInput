@@ -80,23 +80,15 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 
 	if(!g_lastMouseEvents.empty())
 	{
+		LONG relativeX = 0;
+		LONG relativeY = 0;
 		do
 		{
 			RAWMOUSE& rawMouse = g_lastMouseEvents.front();
 			if(rawMouse.lLastX != 0)
-			{
-				DIDEVICEOBJECTDATA xMotion;
-				xMotion.dwOfs = DIMOFS_X;
-				xMotion.dwData = static_cast<DWORD>(rawMouse.lLastX);
-				g_generatedMouseEvents.push_back(xMotion);
-			}
+				relativeX += rawMouse.lLastX;
 			if(rawMouse.lLastY != 0)
-			{
-				DIDEVICEOBJECTDATA yMotion;
-				yMotion.dwOfs = DIMOFS_Y;
-				yMotion.dwData = static_cast<DWORD>(rawMouse.lLastY);
-				g_generatedMouseEvents.push_back(yMotion);
-			}
+				relativeY += rawMouse.lLastY;
 			if(rawMouse.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
 			{
 				float wheelDelta = static_cast<float>(static_cast<short>(rawMouse.usButtonData));
@@ -163,6 +155,21 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 			}
 			g_lastMouseEvents.pop_front();
 		} while(!g_lastMouseEvents.empty());
+
+		if(relativeX != 0)
+		{
+			DIDEVICEOBJECTDATA xMotion;
+			xMotion.dwOfs = DIMOFS_X;
+			xMotion.dwData = static_cast<DWORD>(relativeX);
+			g_generatedMouseEvents.push_back(xMotion);
+		}
+		if(relativeY != 0)
+		{
+			DIDEVICEOBJECTDATA yMotion;
+			yMotion.dwOfs = DIMOFS_Y;
+			yMotion.dwData = static_cast<DWORD>(relativeY);
+			g_generatedMouseEvents.push_back(yMotion);
+		}
 	}
 
 	if(!rgdod)
