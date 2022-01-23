@@ -8,6 +8,10 @@ extern bool IsMouseAcquired;
 extern std::list<RAWMOUSE> g_lastMouseEvents;
 std::list<DIDEVICEOBJECTDATA> g_generatedMouseEvents;
 
+extern bool g_UseAccumulation;
+extern float g_SpeedMultiplierX;
+extern float g_SpeedMultiplierY;
+
 HRESULT m_IDirectInputMouse7A::QueryInterface(REFIID riid, LPVOID FAR* ppvObj)
 {
 	(void)riid;
@@ -86,9 +90,9 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 		{
 			RAWMOUSE& rawMouse = g_lastMouseEvents.front();
 			if(rawMouse.lLastX != 0)
-				relativeX += rawMouse.lLastX;
+				relativeX = (g_UseAccumulation ? relativeX : 0) + rawMouse.lLastX;
 			if(rawMouse.lLastY != 0)
-				relativeY += rawMouse.lLastY;
+				relativeY = (g_UseAccumulation ? relativeY : 0) + rawMouse.lLastY;
 			if(rawMouse.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
 			{
 				float wheelDelta = static_cast<float>(static_cast<short>(rawMouse.usButtonData));
@@ -160,14 +164,14 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 		{
 			DIDEVICEOBJECTDATA xMotion;
 			xMotion.dwOfs = DIMOFS_X;
-			xMotion.dwData = static_cast<DWORD>(relativeX);
+			xMotion.dwData = static_cast<DWORD>(static_cast<LONG>(relativeX * g_SpeedMultiplierX));
 			g_generatedMouseEvents.push_back(xMotion);
 		}
 		if(relativeY != 0)
 		{
 			DIDEVICEOBJECTDATA yMotion;
 			yMotion.dwOfs = DIMOFS_Y;
-			yMotion.dwData = static_cast<DWORD>(relativeY);
+			yMotion.dwData = static_cast<DWORD>(static_cast<LONG>(relativeY * g_SpeedMultiplierY));
 			g_generatedMouseEvents.push_back(yMotion);
 		}
 	}

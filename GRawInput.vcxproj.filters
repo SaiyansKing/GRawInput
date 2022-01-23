@@ -15,9 +15,6 @@
     <ClCompile Include="src\dinput\IDirectInputKeyboard7A.cpp">
       <Filter>dinput</Filter>
     </ClCompile>
-    <ClCompile Include="src\dinput\IDirectInputMouseUnion7A.cpp">
-      <Filter>dinput</Filter>
-    </ClCompile>
     <ClCompile Include="src\keymapping.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -43,8 +40,5 @@
       <Filter>dinput</Filter>
     </ClInclude>
     <ClInclude Include="src\keymapping.h" />
-    <ClInclude Include="src\dinput\IDirectInputMouseUnion7A.h">
-      <Filter>dinput</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,6 +1,5 @@
 #include "IDirectInput7A.h"
 #include "IDirectInputMouse7A.h"
-#include "IDirectInputMouseUnion7A.h"
 #include "IDirectInputKeyboard7A.h"
 #include "IDirectInputJoystick7A.h"
 
@@ -8,8 +7,6 @@
 #define DIDEVTYPE_MOUSE 2
 #define DIDEVTYPE_KEYBOARD 3
 #define DIDEVTYPE_JOYSTICK 4
-
-extern bool IsEnabledUnionWrapper;
 
 HRESULT m_IDirectInput7A::QueryInterface(REFIID riid, LPVOID FAR* ppvObj)
 {
@@ -82,11 +79,9 @@ HRESULT m_IDirectInput7A::FindDevice(REFGUID, LPCSTR, LPGUID)
 
 HRESULT m_IDirectInput7A::CreateDeviceEx(REFGUID rguid, REFIID, LPVOID* lplpDirectInputDevice, LPUNKNOWN)
 {
-	void CheckUnionWrapper(); CheckUnionWrapper();
-
 	const GUID JoyStick = { 0xF5049E78, 0x4861, 0x11D2, { 0xA4, 0x07, 0x00, 0xA0, 0xC9, 0x06, 0x29, 0xA8 } };
 	if(rguid == GUID_SysKeyboard) *lplpDirectInputDevice = new m_IDirectInputKeyboard7A();
-	else if(rguid == GUID_SysMouse) *lplpDirectInputDevice = (IsEnabledUnionWrapper ? reinterpret_cast<void*>(new m_IDirectInputMouseUnion7A()) : reinterpret_cast<void*>(new m_IDirectInputMouse7A()));
+	else if(rguid == GUID_SysMouse) *lplpDirectInputDevice = new m_IDirectInputMouse7A();
 	else if(rguid == JoyStick) *lplpDirectInputDevice = new m_IDirectInputJoystick7A();
 	else return DIERR_GENERIC;
 	return DI_OK;
