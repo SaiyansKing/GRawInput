@@ -9,9 +9,12 @@ void* g_directInput;
 int WINAPI Hooked_MessageBoxA(HWND hWnd, const char* lpText, const char* lpCaption, UINT uType)
 {
 	DWORD dwOldProtect, dwNewProtect;
-	VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, PAGE_READWRITE, &dwOldProtect);
-	memcpy(reinterpret_cast<LPVOID>(addressMessageBox), oldMessageBoxBytes, 5);
-	VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, dwOldProtect, &dwNewProtect);
+	if(VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+	{
+		memcpy(reinterpret_cast<LPVOID>(addressMessageBox), oldMessageBoxBytes, 5);
+		VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, dwOldProtect, &dwNewProtect);
+		FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<LPVOID>(addressMessageBox), 5);
+	}
 	return 0;
 }
 
@@ -42,11 +45,14 @@ extern "C"
 
 		DWORD dwOldProtect, dwNewProtect, dwNewCall;
 		dwNewCall = reinterpret_cast<DWORD>(&Hooked_MessageBoxA) - addressMessageBox - 5;
-		VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, PAGE_READWRITE, &dwOldProtect);
-		memcpy(oldMessageBoxBytes, reinterpret_cast<LPVOID>(addressMessageBox), 5);
-		*reinterpret_cast<BYTE*>(addressMessageBox) = 0xE9;
-		*reinterpret_cast<DWORD*>(addressMessageBox + 1) = dwNewCall;
-		VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, dwOldProtect, &dwNewProtect);
+		if(VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+		{
+			memcpy(oldMessageBoxBytes, reinterpret_cast<LPVOID>(addressMessageBox), 5);
+			*reinterpret_cast<BYTE*>(addressMessageBox) = 0xE9;
+			*reinterpret_cast<DWORD*>(addressMessageBox + 1) = dwNewCall;
+			VirtualProtect(reinterpret_cast<LPVOID>(addressMessageBox), 5, dwOldProtect, &dwNewProtect);
+			FlushInstructionCache(GetCurrentProcess(), reinterpret_cast<LPVOID>(addressMessageBox), 5);
+		}
 
 		g_directInput = nullptr;
 		*lplpDD = g_directInput;
