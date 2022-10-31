@@ -22,6 +22,15 @@ extern "C"
 {
 	HRESULT WINAPI _DirectInput8Create(HINSTANCE, DWORD, REFIID, LPVOID* lplpDD, LPUNKNOWN)
 	{
+		if(HMODULE dinputdll = GetModuleHandleA("dinput.dll"))
+		{
+			if(!GetProcAddress(dinputdll, "DInputToRawInput"))
+			{
+				MessageBoxA(nullptr, "Looks like you don't have correct dinput.dll component installed.", "GRawInput", MB_ICONERROR);
+				exit(-1);
+			}
+		}
+
 		if(addressMessageBox == 0)
 		{
 			HMODULE user32dll = GetModuleHandleA("user32.dll");
