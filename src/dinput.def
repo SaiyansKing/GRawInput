@@ -4,6 +4,7 @@ EXPORTS
 DirectInputCreateA=_DirectInputCreateA		@1
 DirectInputCreateEx=_DirectInputCreateEx	@2
 DirectInputCreateW=_DirectInputCreateW		@3
+RegisterWrapCheck=_RegisterWrapCheck		PRIVATE
 DInputToRawInput=_DInputToRawInput			PRIVATE
 DllCanUnloadNow=_DllCanUnloadNow			PRIVATE
 DllGetClassObject=_DllGetClassObject		PRIVATE
