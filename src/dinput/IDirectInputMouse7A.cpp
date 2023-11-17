@@ -8,6 +8,8 @@ extern bool IsMouseAcquired;
 extern std::list<RAWMOUSE> g_lastMouseEvents;
 std::list<DIDEVICEOBJECTDATA> g_generatedMouseEvents;
 
+extern RAWMOUSE g_lastMouseState;
+
 extern bool g_UseAccumulation;
 extern float g_SpeedMultiplierX;
 extern float g_SpeedMultiplierY;
@@ -68,9 +70,47 @@ HRESULT m_IDirectInputMouse7A::Unacquire()
 	return DI_OK;
 }
 
-HRESULT m_IDirectInputMouse7A::GetDeviceState(DWORD, LPVOID)
+HRESULT m_IDirectInputMouse7A::GetDeviceState(DWORD size, LPVOID lpDeviceState)
 {
-	// Not used
+	if (!IsMouseAcquired)
+		return DIERR_NOTACQUIRED;
+
+	DIMOUSESTATE2* deviceStateOut = reinterpret_cast<DIMOUSESTATE2*>(lpDeviceState);
+
+	LONG relativeX = 0;
+	LONG relativeY = 0;
+
+	if (g_lastMouseState.lLastX != 0)
+		relativeX = (g_UseAccumulation ? relativeX : 0) + g_lastMouseState.lLastX;
+	if (g_lastMouseState.lLastY != 0)
+		relativeY = (g_UseAccumulation ? relativeY : 0) + g_lastMouseState.lLastY;
+
+	float scrollDelta = 0.0f;
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
+		scrollDelta = static_cast<float>(static_cast<short>(g_lastMouseState.usButtonData));
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_1_DOWN | RI_MOUSE_BUTTON_1_UP))
+		deviceStateOut->rgbButtons[0] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN ? 0x80 : 0);
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_2_DOWN | RI_MOUSE_BUTTON_2_UP))
+		deviceStateOut->rgbButtons[1] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN ? 0x80 : 0);
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_3_DOWN | RI_MOUSE_BUTTON_3_UP))
+		deviceStateOut->rgbButtons[2] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN ? 0x80 : 0);
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_4_DOWN | RI_MOUSE_BUTTON_4_UP))
+		deviceStateOut->rgbButtons[3] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN ? 0x80 : 0);
+
+	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_5_DOWN | RI_MOUSE_BUTTON_5_UP))
+		deviceStateOut->rgbButtons[4] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN ? 0x80 : 0);
+
+	deviceStateOut->lX = static_cast<DWORD>(static_cast<LONG>(relativeX * g_SpeedMultiplierX));
+	deviceStateOut->lY = static_cast<DWORD>(static_cast<LONG>(relativeY * g_SpeedMultiplierY));
+	deviceStateOut->lZ = static_cast<LONG>(scrollDelta > 0 ? ceilf(scrollDelta) : floorf(scrollDelta));
+
+	memset(&g_lastMouseState, 0, sizeof(RAWMOUSE));
+
 	return DI_OK;
 }
 
