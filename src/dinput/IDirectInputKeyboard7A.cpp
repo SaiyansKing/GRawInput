@@ -10,6 +10,8 @@ extern bool g_keyboardButtonState[256];
 extern std::list<RAWKEYBOARD> g_lastKeyboardEvents;
 std::list<DIDEVICEOBJECTDATA> g_generatedKeyboardEvents;
 
+extern CRITICAL_SECTION g_criticalSection;
+
 HRESULT m_IDirectInputKeyboard7A::QueryInterface(REFIID riid, LPVOID FAR* ppvObj)
 {
 	(void)riid;
@@ -82,6 +84,8 @@ HRESULT m_IDirectInputKeyboard7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOB
 
 	if(!g_lastKeyboardEvents.empty())
 	{
+		EnterCriticalSection(&g_criticalSection);
+
 		do
 		{
 			RAWKEYBOARD& rawKeyboard = g_lastKeyboardEvents.front();
@@ -107,6 +111,8 @@ HRESULT m_IDirectInputKeyboard7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOB
 			}
 			g_lastKeyboardEvents.pop_front();
 		} while(!g_lastKeyboardEvents.empty());
+
+		LeaveCriticalSection(&g_criticalSection);
 	}
 	
 	if(!rgdod)

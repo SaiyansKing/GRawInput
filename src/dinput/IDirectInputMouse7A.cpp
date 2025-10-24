@@ -9,6 +9,7 @@ extern std::list<RAWMOUSE> g_lastMouseEvents;
 std::list<DIDEVICEOBJECTDATA> g_generatedMouseEvents;
 
 extern RAWMOUSE g_lastMouseState;
+extern CRITICAL_SECTION g_criticalSection;
 
 extern bool g_UseAccumulation;
 extern float g_SpeedMultiplierX;
@@ -72,45 +73,42 @@ HRESULT m_IDirectInputMouse7A::Unacquire()
 
 HRESULT m_IDirectInputMouse7A::GetDeviceState(DWORD size, LPVOID lpDeviceState)
 {
-	if (!IsMouseAcquired)
+	if(!IsMouseAcquired)
 		return DIERR_NOTACQUIRED;
 
 	DIMOUSESTATE2* deviceStateOut = reinterpret_cast<DIMOUSESTATE2*>(lpDeviceState);
+	if(!deviceStateOut)
+		return DIERR_INVALIDPARAM;
 
-	LONG relativeX = 0;
-	LONG relativeY = 0;
+	EnterCriticalSection(&g_criticalSection);
 
-	if (g_lastMouseState.lLastX != 0)
-		relativeX = (g_UseAccumulation ? relativeX : 0) + g_lastMouseState.lLastX;
-	if (g_lastMouseState.lLastY != 0)
-		relativeY = (g_UseAccumulation ? relativeY : 0) + g_lastMouseState.lLastY;
-
+	LONG relativeX = g_lastMouseState.lLastX;
+	LONG relativeY = g_lastMouseState.lLastY;
 	float scrollDelta = 0.0f;
-
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
 		scrollDelta = static_cast<float>(static_cast<short>(g_lastMouseState.usButtonData));
 
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_1_DOWN | RI_MOUSE_BUTTON_1_UP))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_1_DOWN | RI_MOUSE_BUTTON_1_UP))
 		deviceStateOut->rgbButtons[0] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN ? 0x80 : 0);
 
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_2_DOWN | RI_MOUSE_BUTTON_2_UP))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_2_DOWN | RI_MOUSE_BUTTON_2_UP))
 		deviceStateOut->rgbButtons[1] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN ? 0x80 : 0);
 
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_3_DOWN | RI_MOUSE_BUTTON_3_UP))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_3_DOWN | RI_MOUSE_BUTTON_3_UP))
 		deviceStateOut->rgbButtons[2] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN ? 0x80 : 0);
 
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_4_DOWN | RI_MOUSE_BUTTON_4_UP))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_4_DOWN | RI_MOUSE_BUTTON_4_UP))
 		deviceStateOut->rgbButtons[3] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN ? 0x80 : 0);
 
-	if (g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_5_DOWN | RI_MOUSE_BUTTON_5_UP))
+	if(g_lastMouseState.usButtonFlags & (RI_MOUSE_BUTTON_5_DOWN | RI_MOUSE_BUTTON_5_UP))
 		deviceStateOut->rgbButtons[4] = (g_lastMouseState.usButtonFlags & RI_MOUSE_BUTTON_5_DOWN ? 0x80 : 0);
 
-	deviceStateOut->lX = static_cast<DWORD>(static_cast<LONG>(relativeX * g_SpeedMultiplierX));
-	deviceStateOut->lY = static_cast<DWORD>(static_cast<LONG>(relativeY * g_SpeedMultiplierY));
+	deviceStateOut->lX = static_cast<LONG>(relativeX * g_SpeedMultiplierX);
+	deviceStateOut->lY = static_cast<LONG>(relativeY * g_SpeedMultiplierY);
 	deviceStateOut->lZ = static_cast<LONG>(scrollDelta > 0 ? ceilf(scrollDelta) : floorf(scrollDelta));
+	g_lastMouseState = {};
 
-	memset(&g_lastMouseState, 0, sizeof(RAWMOUSE));
-
+	LeaveCriticalSection(&g_criticalSection);
 	return DI_OK;
 }
 
@@ -124,21 +122,21 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 
 	if(!g_lastMouseEvents.empty())
 	{
+		EnterCriticalSection(&g_criticalSection);
+
 		LONG relativeX = 0;
 		LONG relativeY = 0;
 		do
 		{
 			RAWMOUSE& rawMouse = g_lastMouseEvents.front();
-			if(rawMouse.lLastX != 0)
-				relativeX = (g_UseAccumulation ? relativeX : 0) + rawMouse.lLastX;
-			if(rawMouse.lLastY != 0)
-				relativeY = (g_UseAccumulation ? relativeY : 0) + rawMouse.lLastY;
+			if(rawMouse.lLastX != 0) relativeX = (g_UseAccumulation ? relativeX : 0) + rawMouse.lLastX;
+			if(rawMouse.lLastY != 0) relativeY = (g_UseAccumulation ? relativeY : 0) + rawMouse.lLastY;
 			if(rawMouse.usButtonFlags & (RI_MOUSE_WHEEL | RI_MOUSE_HWHEEL))
 			{
 				float wheelDelta = static_cast<float>(static_cast<short>(rawMouse.usButtonData));
-				float numTicks = wheelDelta / WHEEL_DELTA;
+				float numTicks = (wheelDelta / WHEEL_DELTA);
 
-				bool isHorizontalScroll = (rawMouse.usButtonFlags & RI_MOUSE_HWHEEL) == RI_MOUSE_HWHEEL;
+				bool isHorizontalScroll = (rawMouse.usButtonFlags & RI_MOUSE_HWHEEL);
 				bool isScrollByPage = false;
 				float scrollDelta = numTicks;
 				if(isHorizontalScroll)
@@ -162,6 +160,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 				zMotion.dwData = static_cast<DWORD>(static_cast<LONG>(scrollDelta > 0 ? ceilf(scrollDelta) : floorf(scrollDelta)));
 				g_generatedMouseEvents.push_back(zMotion);
 			}
+
 			if(rawMouse.usButtonFlags & (RI_MOUSE_BUTTON_1_DOWN | RI_MOUSE_BUTTON_1_UP))
 			{
 				DIDEVICEOBJECTDATA mouseButton;
@@ -169,6 +168,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 				mouseButton.dwData = (rawMouse.usButtonFlags & RI_MOUSE_BUTTON_1_DOWN ? 0x80 : 0);
 				g_generatedMouseEvents.push_back(mouseButton);
 			}
+
 			if(rawMouse.usButtonFlags & (RI_MOUSE_BUTTON_2_DOWN | RI_MOUSE_BUTTON_2_UP))
 			{
 				DIDEVICEOBJECTDATA mouseButton;
@@ -176,6 +176,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 				mouseButton.dwData = (rawMouse.usButtonFlags & RI_MOUSE_BUTTON_2_DOWN ? 0x80 : 0);
 				g_generatedMouseEvents.push_back(mouseButton);
 			}
+
 			if(rawMouse.usButtonFlags & (RI_MOUSE_BUTTON_3_DOWN | RI_MOUSE_BUTTON_3_UP))
 			{
 				DIDEVICEOBJECTDATA mouseButton;
@@ -183,6 +184,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 				mouseButton.dwData = (rawMouse.usButtonFlags & RI_MOUSE_BUTTON_3_DOWN ? 0x80 : 0);
 				g_generatedMouseEvents.push_back(mouseButton);
 			}
+
 			if(rawMouse.usButtonFlags & (RI_MOUSE_BUTTON_4_DOWN | RI_MOUSE_BUTTON_4_UP))
 			{
 				DIDEVICEOBJECTDATA mouseButton;
@@ -190,6 +192,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 				mouseButton.dwData = (rawMouse.usButtonFlags & RI_MOUSE_BUTTON_4_DOWN ? 0x80 : 0);
 				g_generatedMouseEvents.push_back(mouseButton);
 			}
+
 			if(rawMouse.usButtonFlags & (RI_MOUSE_BUTTON_5_DOWN | RI_MOUSE_BUTTON_5_UP))
 			{
 				DIDEVICEOBJECTDATA mouseButton;
@@ -200,6 +203,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 			g_lastMouseEvents.pop_front();
 		} while(!g_lastMouseEvents.empty());
 
+		LeaveCriticalSection(&g_criticalSection);
 		if(relativeX != 0)
 		{
 			DIDEVICEOBJECTDATA xMotion;
@@ -207,6 +211,7 @@ HRESULT m_IDirectInputMouse7A::GetDeviceData(DWORD cbObjectData, LPDIDEVICEOBJEC
 			xMotion.dwData = static_cast<DWORD>(static_cast<LONG>(relativeX * g_SpeedMultiplierX));
 			g_generatedMouseEvents.push_back(xMotion);
 		}
+
 		if(relativeY != 0)
 		{
 			DIDEVICEOBJECTDATA yMotion;
